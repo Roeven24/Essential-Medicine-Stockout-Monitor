@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Essential Medicine Stockout Monitor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #F0F4F8 0%, #E8EDF2 100%);
+            padding: 20px;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(147, 167, 187, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(167, 182, 194, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFB 100%);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(147, 167, 187, 0.12);
+            margin-bottom: 25px;
+            text-align: center;
+            border: 2px solid rgba(167, 182, 194, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(167, 182, 194, 0.06), transparent);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .header h1 {
+            color: #5B7A8F;
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(91, 122, 143, 0.08);
+            position: relative;
+        }
+
+        .header p {
+            color: #7D94A6;
+            font-size: 1.1em;
+            font-weight: 400;
+        }
+
+        .filters {
+            background: linear-gradient(135deg, #FDFBF7 0%, #F7F0E8 100%);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(101, 84, 63, 0.12);
+            margin-bottom: 25px;
+            border: 2px solid rgba(139, 115, 85, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .filters:hover {
+            box-shadow: 0 12px 24px rgba(101, 84, 63, 0.18);
+            transform: translateY(-2px);
+        }
+
+        .filters h3 {
+            color: #5D4E37;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .filter-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-item label {
+            color: #8B7355;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .filter-item select {
+            padding: 12px 15px;
+            border: 2px solid #C9B BA4;
+            border-radius: 10px;
+            background: #FDFBF7;
+            color: #5D4E37;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .filter-item select:hover {
+            border-color: #A08465;
+            box-shadow: 0 4px 12px rgba(139, 115, 85, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .filter-item select:focus {
+            outline: none;
+            border-color: #8B7355;
+            box-shadow: 0 0 0 3px rgba(139, 115, 85, 0.15);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFB 100%);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(147, 167, 187, 0.12);
+            text-align: center;
+            transition: all 0.4s ease;
+            border: 2px solid rgba(167, 182, 194, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(167, 182, 194, 0.06) 0%, transparent 70%);
+            transform: scale(0);
+            transition: transform 0.6s ease;
+        }
+
+        .stat-card:hover::before {
+            transform: scale(1);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 16px 32px rgba(147, 167, 187, 0.18);
+            border-color: #B0BEC9;
+        }
+
+        .stat-card h4 {
+            color: #7D94A6;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .stat-card .number {
+            color: #5B7A8F;
+            font-size: 2.5em;
+            font-weight: 700;
+            position: relative;
+            z-index: 1;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .chart-container {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFB 100%);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(147, 167, 187, 0.12);
+            border: 2px solid rgba(167, 182, 194, 0.15);
+            transition: all 0.4s ease;
+        }
+
+        .chart-container:hover {
+            box-shadow: 0 16px 32px rgba(147, 167, 187, 0.18);
+            transform: translateY(-5px);
+            border-color: #B0BEC9;
+        }
+
+        .chart-container h3 {
+            color: #5B7A8F;
+            margin-bottom: 20px;
+            font-weight: 600;
+            font-size: 1.2em;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 350px;
+        }
+
+        .footer {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFB 100%);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(147, 167, 187, 0.12);
+            text-align: center;
+            border: 2px solid rgba(167, 182, 194, 0.15);
+        }
+
+        .footer p {
+            color: #7D94A6;
+            margin: 5px 0;
+            font-size: 0.95em;
+        }
+
+        .footer a {
+            color: #5B7A8F;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            padding: 2px 8px;
+            border-radius: 5px;
+        }
+
+        .footer a:hover {
+            background: rgba(167, 182, 194, 0.12);
+            color: #48667D;
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 Essential Medicine Stockout Monitor</h1>
+            <p>Real-time Inventory Dashboard for Rural Health Units</p>
+        </div>
+
+        <div class="filters">
+            <h3>📊 Filter Options</h3>
+            <div class="filter-group">
+                <div class="filter-item">
+                    <label for="categoryFilter">Medicine Category:</label>
+                    <select id="categoryFilter">
+                        <option value="all">All Categories</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="dosageFilter">Dosage Form:</label>
+                    <select id="dosageFilter">
+                        <option value="all">All Forms</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="stockFilter">Stock Level:</label>
+                    <select id="stockFilter">
+                        <option value="all">All Levels</option>
+                        <option value="nostock">No Stock (0)</option>
+                        <option value="lowstock">Low Stock (1-50)</option>
+                        <option value="plenty">Plenty (51-100)</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="classificationFilter">Classification:</label>
+                    <select id="classificationFilter">
+                        <option value="all">All Classifications</option>
+                        <option value="Over-the-Counter">Over-the-Counter</option>
+                        <option value="Prescription">Prescription</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h4>Total Medicines</h4>
+                <div class="number" id="totalMeds">0</div>
+            </div>
+            <div class="stat-card">
+                <h4>Critical Stock Items</h4>
+                <div class="number" id="criticalStock">0</div>
+            </div>
+            <div class="stat-card">
+                <h4>OTC Medicines</h4>
+                <div class="number" id="otcCount">0</div>
+            </div>
+            <div class="stat-card">
+                <h4>Prescription Only</h4>
+                <div class="number" id="prescriptionCount">0</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h3>📦 Stock Level Distribution</h3>
+                <div class="chart-wrapper">
+                    <canvas id="stockChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container">
+                <h3>💊 Medicine Categories</h3>
+                <div class="chart-wrapper">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container">
+                <h3>💉 Dosage Form Distribution</h3>
+                <div class="chart-wrapper">
+                    <canvas id="dosageChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container">
+                <h3>📋 Classification Breakdown</h3>
+                <div class="chart-wrapper">
+                    <canvas id="classificationChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container">
+                <h3>🔍 Category by Classification</h3>
+                <div class="chart-wrapper">
+                    <canvas id="categoryClassChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container">
+                <h3>📊 Top 10 Medicine Types</h3>
+                <div class="chart-wrapper">
+                    <canvas id="topMedsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Submitted By:</strong> J.C. Roeven Peji</p>
+            <p><strong>Submitted To:</strong> Engr. Val Patrick Fabregas, MTA</p>
+            <p><strong>Data Sources:</strong></p>
+            <p>
+                <a href="https://www.kaggle.com/datasets/ujjwalaggarwal402/medicine-dataset" target="_blank">Medicine Dataset (Kaggle)</a> | 
+                <a href="https://www.kaggle.com/datasets/pritipoddar/inventory-data-for-pharmacy-website-in-json-format" target="_blank">Pharmacy Inventory Data (Kaggle)</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const medicineData = `Name,Category,Dosage Form,countInStock,Classification
+Acetocillin,Antidiabetic,Cream,0,Over-the-Counter
+Ibuprocillin,Antiviral,Injection,15,Over-the-Counter
+Dextrophen,Antibiotic,Ointment,0,Prescription
+Clarinazole,Antifungal,Syrup,8,Prescription
+Amoxicillin,Antifungal,Tablet,95,Over-the-Counter
+Ibupromycin,Antibiotic,Injection,23,Prescription
+Metovir,Antipyretic,Ointment,78,Over-the-Counter
+Ibuprovir,Antidepressant,Syrup,42,Over-the-Counter
+Cefcillin,Antipyretic,Tablet,0,Over-the-Counter
+Acetomycin,Analgesic,Inhaler,5,Prescription
+Ibuprocillin,Antifungal,Ointment,67,Prescription
+Acetonazole,Antipyretic,Ointment,31,Prescription
+Dolocillin,Antiviral,Ointment,88,Prescription
+Cefmet,Antifungal,Tablet,0,Prescription
+Dolophen,Antibiotic,Capsule,12,Prescription
+Ibupronazole,Analgesic,Injection,92,Prescription
+Amoxiprofen,Antiviral,Ointment,47,Prescription
+Acetomycin,Antiviral,Drops,85,Over-the-Counter
+Amoxistatin,Antiviral,Inhaler,0,Over-the-Counter
+Dextrocillin,Antidiabetic,Inhaler,29,Over-the-Counter
+Metovir,Antifungal,Injection,73,Prescription
+Cefmet,Analgesic,Cream,18,Over-the-Counter
+Clariphen,Antidiabetic,Syrup,91,Over-the-Counter
+Ibuprocillin,Antibiotic,Inhaler,0,Prescription
+Dolomet,Antifungal,Drops,44,Prescription
+Acetoprofen,Antibiotic,Inhaler,7,Prescription
+Amoximet,Analgesic,Ointment,63,Prescription
+Cefmet,Antidepressant,Injection,38,Over-the-Counter
+Doloprofen,Antibiotic,Inhaler,0,Over-the-Counter
+Clariprofen,Antifungal,Tablet,56,Prescription
+Metocillin,Analgesic,Tablet,82,Over-the-Counter
+Ibupromycin,Analgesic,Capsule,21,Over-the-Counter
+Cefstatin,Antipyretic,Ointment,0,Prescription
+Metomycin,Antifungal,Capsule,94,Over-the-Counter
+Acetomycin,Antifungal,Syrup,35,Over-the-Counter
+Metoprofen,Antiseptic,Capsule,10,Prescription
+Clarivir,Analgesic,Tablet,68,Prescription
+Ibuproprofen,Analgesic,Cream,0,Over-the-Counter
+Metocillin,Antibiotic,Cream,87,Over-the-Counter
+Cefprofen,Antiseptic,Tablet,49,Over-the-Counter
+Dextromycin,Antipyretic,Capsule,26,Over-the-Counter
+Acetonazole,Antidepressant,Ointment,0,Prescription
+Dextromycin,Antibiotic,Inhaler,71,Over-the-Counter
+Ibupromycin,Antipyretic,Injection,14,Prescription
+Amoxicillin,Analgesic,Cream,93,Over-the-Counter
+Ibupronazole,Antiseptic,Cream,0,Prescription
+Clariprofen,Antidiabetic,Injection,40,Prescription
+Ibupromycin,Antibiotic,Inhaler,76,Prescription
+Acetophen,Analgesic,Cream,3,Over-the-Counter
+Dextrostatin,Antifungal,Capsule,59,Prescription
+Dolomet,Antiseptic,Tablet,0,Over-the-Counter
+Metophen,Antiseptic,Tablet,33,Prescription
+Clariphen,Antipyretic,Syrup,86,Over-the-Counter
+Cefcillin,Antidiabetic,Ointment,19,Over-the-Counter
+Amoximet,Antifungal,Capsule,0,Over-the-Counter
+Amoxivir,Antifungal,Syrup,62,Over-the-Counter
+Metophen,Antidiabetic,Drops,45,Over-the-Counter
+Clariphen,Analgesic,Ointment,90,Over-the-Counter
+Cefmet,Antidepressant,Injection,0,Prescription
+Cefnazole,Antiviral,Inhaler,27,Prescription
+Acetovir,Antidepressant,Injection,74,Prescription
+Dextrophen,Analgesic,Inhaler,11,Over-the-Counter
+Amoxinazole,Analgesic,Ointment,0,Prescription
+Dextromet,Antiviral,Syrup,58,Prescription
+Clarinazole,Antibiotic,Syrup,36,Over-the-Counter
+Ibuproprofen,Antidepressant,Inhaler,0,Over-the-Counter
+Clarinazole,Analgesic,Tablet,81,Prescription
+Clariprofen,Antidepressant,Cream,22,Prescription
+Clarimycin,Antibiotic,Syrup,96,Over-the-Counter
+Acetostatin,Analgesic,Inhaler,0,Prescription
+Ibuprophen,Antifungal,Ointment,65,Over-the-Counter
+Ibuprovir,Antiseptic,Capsule,48,Over-the-Counter
+Cefnazole,Antifungal,Capsule,4,Over-the-Counter
+Amoxinazole,Antidiabetic,Tablet,0,Over-the-Counter
+Metovir,Antidiabetic,Inhaler,79,Over-the-Counter
+Clarimet,Antidepressant,Injection,34,Prescription
+Acetomet,Antiviral,Drops,0,Prescription
+Dolomet,Antidepressant,Syrup,52,Prescription
+Cefcillin,Antifungal,Inhaler,89,Over-the-Counter
+Metoprofen,Antifungal,Injection,0,Prescription
+Claricillin,Antidiabetic,Tablet,25,Prescription
+Clariprofen,Antidepressant,Drops,70,Over-the-Counter
+Cefphen,Antifungal,Cream,16,Prescription
+Metophen,Antifungal,Tablet,0,Prescription
+Ibuprocillin,Antidepressant,Inhaler,54,Prescription
+Metoprofen,Antibiotic,Drops,83,Prescription
+Metostatin,Antipyretic,Ointment,0,Over-the-Counter
+Cefstatin,Antidiabetic,Cream,41,Over-the-Counter
+Clarimet,Antidiabetic,Inhaler,97,Over-the-Counter
+Amoxistatin,Antibiotic,Capsule,0,Over-the-Counter
+Metovir,Antidiabetic,Drops,28,Prescription
+Ibupromycin,Analgesic,Ointment,75,Over-the-Counter
+Dextronazole,Antiseptic,Tablet,0,Prescription
+Dolonazole,Antifungal,Ointment,61,Over-the-Counter
+Acetostatin,Antipyretic,Drops,13,Prescription
+Cefmet,Analgesic,Inhaler,0,Prescription
+Doloprofen,Antipyretic,Inhaler,84,Over-the-Counter
+Claristatin,Antipyretic,Capsule,37,Prescription
+Acetovir,Antibiotic,Capsule,0,Prescription
+Amoxivir,Antidiabetic,Tablet,69,Over-the-Counter
+Dolonazole,Antiseptic,Injection,50,Over-the-Counter
+Ibuprophen,Antidepressant,Drops,0,Prescription
+Acetostatin,Antidiabetic,Cream,20,Prescription
+Metomycin,Analgesic,Inhaler,72,Prescription
+Dextromet,Antiseptic,Syrup,0,Prescription
+Metovir,Antifungal,Ointment,46,Prescription
+Clarinazole,Antidiabetic,Injection,91,Prescription
+Amoximycin,Antipyretic,Syrup,0,Over-the-Counter
+Dolomet,Analgesic,Drops,57,Over-the-Counter
+Amoximycin,Antiviral,Capsule,30,Over-the-Counter
+Claristatin,Antidepressant,Injection,0,Prescription
+Ibuprocillin,Antipyretic,Ointment,77,Over-the-Counter
+Metophen,Antiseptic,Injection,24,Over-the-Counter
+Acetoprofen,Antiviral,Injection,0,Prescription
+Cefnazole,Antipyretic,Capsule,64,Prescription
+Amoxicillin,Antidepressant,Tablet,88,Over-the-Counter
+Claristatin,Antibiotic,Injection,0,Over-the-Counter
+Dextrocillin,Antidepressant,Inhaler,43,Over-the-Counter
+Dextromycin,Antidiabetic,Ointment,9,Over-the-Counter
+Dolophen,Antibiotic,Tablet,0,Over-the-Counter
+Metoprofen,Antiviral,Inhaler,66,Prescription
+Dolomet,Antiviral,Tablet,32,Prescription
+Amoximycin,Antidiabetic,Cream,0,Prescription
+Dolomycin,Antidiabetic,Capsule,55,Prescription
+Metophen,Antipyretic,Capsule,80,Over-the-Counter
+Dolomycin,Antidepressant,Inhaler,0,Prescription
+Dolophen,Analgesic,Ointment,39,Prescription
+Metonazole,Analgesic,Cream,87,Prescription
+Metomet,Analgesic,Syrup,0,Over-the-Counter
+Acetomet,Analgesic,Capsule,51,Over-the-Counter
+Doloprofen,Antipyretic,Syrup,17,Prescription
+Dextrostatin,Antifungal,Cream,0,Over-the-Counter
+Cefprofen,Antibiotic,Ointment,73,Over-the-Counter
+Metomet,Antidepressant,Injection,28,Prescription
+Acetovir,Analgesic,Tablet,0,Prescription
+Dextrovir,Antifungal,Inhaler,60,Prescription
+Clarivir,Antidiabetic,Drops,6,Prescription
+Clarimycin,Antiviral,Cream,0,Prescription
+Amoxicillin,Antipyretic,Drops,85,Prescription
+Clarivir,Antibiotic,Capsule,44,Over-the-Counter
+Metophen,Antidiabetic,Capsule,0,Over-the-Counter
+Metonazole,Antibiotic,Drops,71,Over-the-Counter
+Dextronazole,Antibiotic,Ointment,19,Prescription
+Amoximycin,Antiseptic,Drops,0,Prescription
+Ibupromycin,Antidepressant,Drops,53,Prescription
+Metovir,Antidepressant,Ointment,89,Prescription
+Metoprofen,Antibiotic,Ointment,0,Prescription
+Dextrophen,Antidepressant,Inhaler,76,Over-the-Counter
+Cefstatin,Antiviral,Tablet,35,Prescription`;
+
+        let allData = [];
+        let filteredData = [];
+        let charts = {};
+
+        function parseCSV(csv) {
+            const lines = csv.trim().split('\n');
+            const headers = lines[0].split(',');
+            return lines.slice(1).map(line => {
+                const values = line.split(',');
+                return {
+                    name: values[0],
+                    category: values[1],
+                    dosageForm: values[2],
+                    countInStock: parseInt(values[3]),
+                    classification: values[4]
+                };
+            });
+        }
+
+        function populateFilters() {
+            const categories = [...new Set(allData.map(d => d.category))].sort();
+            const dosageForms = [...new Set(allData.map(d => d.dosageForm))].sort();
+
+            const categorySelect = document.getElementById('categoryFilter');
+            const dosageSelect = document.getElementById('dosageFilter');
+
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                categorySelect.appendChild(option);
+            });
+
+            dosageForms.forEach(form => {
+                const option = document.createElement('option');
+                option.value = form;
+                option.textContent = form;
+                dosageSelect.appendChild(option);
+            });
+        }
+
+        function applyFilters() {
+            const category = document.getElementById('categoryFilter').value;
+            const dosage = document.getElementById('dosageFilter').value;
+            const stock = document.getElementById('stockFilter').value;
+            const classification = document.getElementById('classificationFilter').value;
+
+            filteredData = allData.filter(item => {
+                if (category !== 'all' && item.category !== category) return false;
+                if (dosage !== 'all' && item.dosageForm !== dosage) return false;
+                if (classification !== 'all' && item.classification !== classification) return false;
+                
+                if (stock !== 'all') {
+                    if (stock === 'nostock' && item.countInStock !== 0) return false;
+                    if (stock === 'lowstock' && (item.countInStock < 1 || item.countInStock > 50)) return false;
+                    if (stock === 'plenty' && (item.countInStock < 51 || item.countInStock > 100)) return false;
+                }
+                
+                return true;
+            });
+
+            updateDashboard();
+        }
+
+        function updateStats() {
+            document.getElementById('totalMeds').textContent = filteredData.length;
+            
+            const critical = filteredData.filter(d => d.countInStock <= 50).length;
+            document.getElementById('criticalStock').textContent = critical;
+            
+            const otc = filteredData.filter(d => d.classification === 'Over-the-Counter').length;
+            document.getElementById('otcCount').textContent = otc;
+            
+            const prescription = filteredData.filter(d => d.classification === 'Prescription').length;
+            document.getElementById('prescriptionCount').textContent = prescription;
+        }
+
+        function updateCharts() {
+            updateStockChart();
+            updateCategoryChart();
+            updateDosageChart();
+            updateClassificationChart();
+            updateCategoryClassChart();
+            updateTopMedsChart();
+        }
+
+        function updateStockChart() {
+            const noStock = filteredData.filter(d => d.countInStock === 0).length;
+            const lowStock = filteredData.filter(d => d.countInStock > 0 && d.countInStock <= 50).length;
+            const plenty = filteredData.filter(d => d.countInStock > 50).length;
+
+            if (charts.stock) charts.stock.destroy();
+            
+            const ctx = document.getElementById('stockChart').getContext('2d');
+            charts.stock = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['No Stock', 'Low Stock (1-50)', 'Plenty (51-100)'],
+                    datasets: [{
+                        data: [noStock, lowStock, plenty],
+                        backgroundColor: ['#E8A5A5', '#F5D4A0', '#B3D4B3'],
+                        borderWidth: 3,
+                        borderColor: '#FFFFFF',
+                        hoverOffset: 12,
+                        hoverBackgroundColor: ['#E39393', '#F2C889', '#A3C9A3']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { family: 'Montserrat', size: 12 },
+                                padding: 15,
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                color: '#5B7A8F'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(91, 122, 143, 0.95)',
+                            titleFont: { family: 'Montserrat', size: 14, weight: 'bold' },
+                            bodyFont: { family: 'Montserrat', size: 13 },
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateCategoryChart() {
+            const categoryCounts = {};
+            filteredData.forEach(d => {
+                categoryCounts[d.category] = (categoryCounts[d.category] || 0) + 1;
+            });
+
+            const labels = Object.keys(categoryCounts).sort((a, b) => categoryCounts[b] - categoryCounts[a]);
+            const data = labels.map(l => categoryCounts[l]);
+
+            if (charts.category) charts.category.destroy();
+            
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            charts.category = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Count',
+                        data: data,
+                        backgroundColor: [
+                            '#D4B5C4', '#B5C9D4', '#D4C9B5', '#C4D4B5',
+                            '#B5D4C9', '#D4C4B5', '#C9B5D4', '#B5C4D4',
+                            '#D4B5B5', '#C9D4B5', '#B5D4B5', '#D4B5C9'
+                        ],
+                        borderColor: '#FFFFFF',
+                        borderWidth: 3,
+                        borderRadius: 8,
+                        hoverBackgroundColor: [
+                            '#C9A5B9', '#A5BECA', '#CABEA5', '#B9CAA5',
+                            '#A5CABE', '#CAB9A5', '#BEA5CA', '#A5B9CA',
+                            '#CAA5A5', '#BECAA5', '#A5CAA5', '#CAA5BE'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(91, 122, 143, 0.95)',
+                            titleFont: { family: 'Montserrat', size: 14, weight: 'bold' },
+                            bodyFont: { family: 'Montserrat', size: 13 },
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: true,
+                            boxWidth: 15,
+                            boxHeight: 15
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                font: { family: 'Montserrat' },
+                                color: '#7D94A6'
+                            },
+                            grid: {
+                                color: 'rgba(167, 182, 194, 0.15)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: { family: 'Montserrat', size: 10 },
+                                color: '#7D94A6'
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateDosageChart() {
+            const dosageCounts = {};
+            filteredData.forEach(d => {
+                dosageCounts[d.dosageForm] = (dosageCounts[d.dosageForm] || 0) + 1;
+            });
+
+            const labels = Object.keys(dosageCounts).sort((a, b) => dosageCounts[b] - dosageCounts[a]);
+            const data = labels.map(l => dosageCounts[l]);
+
+            if (charts.dosage) charts.dosage.destroy();
+            
+            const ctx = document.getElementById('dosageChart').getContext('2d');
+            charts.dosage = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            '#D4B5C4', '#B5C9D4', '#D4C9B5', '#C4D4B5',
+                            '#B5D4C9', '#D4C4B5', '#C9B5D4', '#B5C4D4'
+                        ],
+                        borderWidth: 3,
+                        borderColor: '#FFFFFF',
+                        hoverOffset: 15,
+                        hoverBorderWidth: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                font: { family: 'Montserrat', size: 11 },
+                                padding: 12,
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                color: '#5B7A8F'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(91, 122, 143, 0.95)',
+                            titleFont: { family: 'Montserrat', size: 14, weight: 'bold' },
+                            bodyFont: { family: 'Montserrat', size: 13 },
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateClassificationChart() {
+            const otc = filteredData.filter(d => d.classification === 'Over-the-Counter').length;
+            const prescription = filteredData.filter(d => d.classification === 'Prescription').length;
+
+            if (charts.classification) charts.classification.destroy();
+            
+            const ctx = document.getElementById('classificationChart').getContext('2d');
+            charts.classification = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Over-the-Counter', 'Prescription'],
+                    datasets: [{
+                        label: 'Medicine Count',
+                        data: [otc, prescription],
+                        backgroundColor: ['#B5C9D4', '#E8A5A5'],
+                        borderColor: ['#A5BECA', '#E39393'],
+                        borderWidth: 3,
+                        borderRadius: 8,
+                        hoverBackgroundColor: ['#A5BECA', '#E39393']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(91, 122, 143, 0.95)',
+                            titleFont: { family: 'Montserrat', size: 14, weight: 'bold' },
+                            bodyFont: { family: 'Montserrat', size: 13 },
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                font: { family: 'Montserrat' },
+                                color: '#7D94A6'
+                            },
+                            grid: {
+                                color: 'rgba(167, 182, 194, 0.15)'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                font: { family: 'Montserrat', size: 13, weight: '600' },
+                                color: '#5B7A8F'
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateCategoryClassChart() {
+            const categoryClass = {};
+            filteredData.forEach(d => {
+                const key = `${d.category}`;
+                if (!categoryClass[key]) {
+                    categoryClass[key] = { otc: 0, prescription: 0 };
+                }
+                if (d.classification === 'Over-the-Counter') {
+                    categoryClass[key].otc++;
+                } else {
+                    categoryClass[key].prescription++;
+                }
+            });
+
+            const labels = Object.keys(categoryClass);
+            const otcData = labels.map(l => categoryClass[l].otc);
+            const prescData = labels.map(l => categoryClass[l].prescription);
+
+            if (charts.categoryClass) charts.categoryClass.destroy();
+            
+            const ctx = document.getElementById('categoryClassChart').getContext('2d');
+            charts.categoryClass = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'OTC',
+                            data: otcData,
+                            backgroundColor: '#B3D4B3',
+                            borderColor: '#A3C9A3',
+                            borderWidth: 2,
+                            borderRadius: 6,
+                            hoverBackgroundColor: '#A3C9A3'
+                        },
+                        {
+                            label: 'Prescription',
+                            data: prescData,
+                            backgroundColor: '#F5D4A0',
+                            borderColor: '#F2C889',
+                            borderWidth: 2,
+                            borderRadius: 6,
+                            hoverBackgroundColor: '#F2C889'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: { family: 'Montserrat', size: 12, weight: '600' },
+                                padding: 15,
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                color: '#5B7A8F'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(91, 122, 143, 0.95)',
+                            titleFont: { family: 'Montserrat', size: 14, weight: 'bold' },
+                            bodyFont: { family: 'Montserrat', size: 13 },
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            ticks: {
+                                font: { family: 'Montserrat', size: 10 },
+                                color: '#7D94A6'
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                font: { family: 'Montserrat' },
+                                color: '#7D94A6'
+                            },
+                            grid: {
+                                color: 'rgba(167, 182, 194, 0.15)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTopMedsChart() {
+            const medCounts = {};
+            filteredData.forEach(d => {
+                medCounts[d.name] = (medCounts[d.name] || 0) + 1;
+            });
+
+            const sorted = Object.entries(medCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+
+            const labels = sorted.map(s => s[0]);
+            const data = sorted.map(s => s[1]);
+
+            if (charts.topMeds) charts.topMeds.destroy();
+            
+            const ctx = document.getElementById('topMedsChart').getContext('2d');
+            charts.topMeds = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Frequency',
+                        data: data,
+                        backgroundColor: [
+                            '#C9B5D4', '#B5C4D4', '#D4B5B5', '#B5D4C9',
+                            '#D4C9B5', '#C4D4B5', '#D4B5C9', '#B5C9D4',
+                            '#D4C4B5', '#C9D4B5'
+                        ],
+                        borderColor: '#FFFFFF',
+                        borderWidth: 3,
+                        borderRadius: 8,
+                        hoverBackgroundColor: [
+                            '#BEA5CA', '#A5B9CA', '#CAA5A5', '#A5CABE',
+                            '#CABEA5', '#B9CAA5', '#CAA5BE', '#A5BECA',
+                            '#CAB9A5', '#BECAA5'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(91, 122, 143, 0.95)',
+                            titleFont: { family: 'Montserrat', size: 14, weight: 'bold' },
+                            bodyFont: { family: 'Montserrat', size: 13 },
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                font: { family: 'Montserrat' },
+                                color: '#7D94A6'
+                            },
+                            grid: {
+                                color: 'rgba(167, 182, 194, 0.15)'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                font: { family: 'Montserrat', size: 10, weight: '600' },
+                                color: '#5B7A8F'
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateDashboard() {
+            updateStats();
+            updateCharts();
+        }
+
+        // Initialize
+        allData = parseCSV(medicineData);
+        filteredData = [...allData];
+        populateFilters();
+        updateDashboard();
+
+        // Event listeners
+        document.getElementById('categoryFilter').addEventListener('change', applyFilters);
+        document.getElementById('dosageFilter').addEventListener('change', applyFilters);
+        document.getElementById('stockFilter').addEventListener('change', applyFilters);
+        document.getElementById('classificationFilter').addEventListener('change', applyFilters);
+    </script>
+</body>
+</html>
